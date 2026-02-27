@@ -7,9 +7,19 @@ set -euo pipefail
 K3S_VERSION="${1:?Usage: $0 <k3s_version> <github_repo>}"
 GITHUB_REPO="${2:?Usage: $0 <k3s_version> <github_repo>}"
 
-echo "==> [1/6] Installing system dependencies..."
+echo "==> [1/6] Installing system dependencies + fixing Oracle Cloud firewall..."
 apt-get update -qq
-apt-get install -y -qq curl jq git
+apt-get install -y -qq curl jq git iptables-persistent netfilter-persistent
+
+# Oracle Cloud VMs have a local iptables that blocks NodePorts by default.
+# OCI Security Lists control external firewall, but local iptables also needs opening.
+echo "    Opening required ports in local iptables..."
+for port in 22 80 443 6443 30080 30180 30300 30443; do
+  iptables -C INPUT -p tcp --dport "${port}" -j ACCEPT 2>/dev/null || \
+    iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
+done
+netfilter-persistent save
+echo "    iptables rules saved."
 
 echo "==> [2/6] Installing k3s ${K3S_VERSION}..."
 # Key flags explained:
