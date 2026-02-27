@@ -153,8 +153,8 @@ jobs:
 
           kubectl config use-context default
 
-          # Verify authentication works
-          kubectl get nodes
+          # Verify authentication works (namespaces allowed by ClusterRole)
+          kubectl get namespaces
 
       # ArgoCD syncs after detecting the new git commit
       # Poll until Application is Healthy+Synced or timeout
