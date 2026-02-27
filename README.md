@@ -1,6 +1,6 @@
 # INT20H 2026 — DevOps Track: Online Boutique on Oracle Cloud + k3s
 
-> **Live Demo:** `http://VM_IP:30080` | **ArgoCD:** `https://VM_IP:30443` | **Grafana:** `http://VM_IP:30300`
+> **Live Demo:** `http://89.168.69.84:30080` | **ArgoCD:** `https://89.168.69.84:30443` | **Grafana:** `http://89.168.69.84:30300`
 
 ---
 
@@ -112,7 +112,7 @@ Push to main (src/frontend or src/cartservice)
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR_ORG/int20h
+git clone https://github.com/r4nol/int20h
 cd int20h
 ```
 
