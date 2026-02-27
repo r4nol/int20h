@@ -4,38 +4,38 @@ kind: Kustomization
 namespace: staging
 
 resources:
-  - ../../base
-  - network-policy.yaml
+- ../../base
+- network-policy.yaml
 
 # CI-managed image tags for frontend + cartservice
 # Initial state: uses upstream gcr.io images (ArgoCD can sync immediately)
 # After first CI run: deploy.yaml updates newName→ghcr.io and newTag→main-<sha>
 # Command used by CI: kustomize edit set image frontend=ghcr.io/r4nol/frontend:main-sha
 images:
-  - name: frontend
-    newName: gcr.io/google-samples/microservices-demo/frontend
-    newTag: "v0.10.0"
-  - name: cartservice
-    newName: gcr.io/google-samples/microservices-demo/cartservice
-    newTag: "v0.10.0"
+- name: cartservice
+  newName: ghcr.io/r4nol/cartservice
+  newTag: latest
+- name: frontend
+  newName: gcr.io/google-samples/microservices-demo/frontend
+  newTag: v0.10.0
 
-patches:
   # All deployments run as single replica in staging (cost saving)
-  - path: patches/replicas.yaml
-    target:
-      kind: Deployment
   # Reduce resource requests for staging
-  - path: patches/resources-frontend.yaml
-    target:
-      kind: Deployment
-      name: frontend
   # Change frontend-external from LoadBalancer to NodePort for staging
-  - path: patches/frontend-service.yaml
-    target:
-      kind: Service
-      name: frontend-external
   # Disable loadgenerator in staging (run manually for demos)
-  - path: patches/loadgenerator.yaml
-    target:
-      kind: Deployment
-      name: loadgenerator
+patches:
+- path: patches/replicas.yaml
+  target:
+    kind: Deployment
+- path: patches/resources-frontend.yaml
+  target:
+    kind: Deployment
+    name: frontend
+- path: patches/frontend-service.yaml
+  target:
+    kind: Service
+    name: frontend-external
+- path: patches/loadgenerator.yaml
+  target:
+    kind: Deployment
+    name: loadgenerator
