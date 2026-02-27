@@ -12,7 +12,7 @@ spec:
   project: boutique-production
 
   source:
-    repoURL: https://github.com/GITHUB_ORG/int20h
+    repoURL: https://github.com/r4nol/int20h
     targetRevision: HEAD
     path: k8s/overlays/production
 

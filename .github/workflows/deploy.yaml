@@ -67,12 +67,18 @@ jobs:
       - name: Update Image Tag
         run: |
           OVERLAY="k8s/overlays/${{ inputs.environment }}"
-          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ inputs.service }}"
+          SERVICE="${{ inputs.service }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${SERVICE}"
           TAG="${{ inputs.image-tag }}"
 
-          echo "Updating ${IMAGE}:${TAG} in ${OVERLAY}"
+          echo "Updating ${SERVICE} → ${IMAGE}:${TAG} in ${OVERLAY}"
           cd "${OVERLAY}"
-          kustomize edit set image "${IMAGE}:${TAG}"
+
+          # KEY: use the short service name as the kustomize image key.
+          # This matches `name: frontend` / `name: cartservice` in kustomization.yaml.
+          # On the FIRST CI run, kustomize changes newName from gcr.io → ghcr.io AND
+          # sets the newTag to the commit SHA. On subsequent runs it only updates newTag.
+          kustomize edit set image "${SERVICE}=${IMAGE}:${TAG}"
 
           echo "=== Updated kustomization.yaml ==="
           cat kustomization.yaml

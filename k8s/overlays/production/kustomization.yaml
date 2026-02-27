@@ -12,14 +12,16 @@ resources:
   - pdb/cartservice-pdb.yaml
 
 # CI-managed image tags for frontend + cartservice
-# Updated automatically by .github/workflows/deploy.yaml
+# Initial state: uses upstream gcr.io images (ArgoCD can sync immediately)
+# After first CI run: deploy.yaml updates newName→ghcr.io and newTag→main-<sha>
+# Command used by CI: kustomize edit set image frontend=ghcr.io/r4nol/frontend:main-sha
 images:
   - name: frontend
-    newName: ghcr.io/GITHUB_ORG/frontend
-    newTag: "v0.10.2-upstream"
+    newName: gcr.io/google-samples/microservices-demo/frontend
+    newTag: "v0.10.2"
   - name: cartservice
-    newName: ghcr.io/GITHUB_ORG/cartservice
-    newTag: "v0.10.2-upstream"
+    newName: gcr.io/google-samples/microservices-demo/cartservice
+    newTag: "v0.10.2"
 
 patches:
   # Production: frontend x2, cartservice x2, rest x1

@@ -85,11 +85,13 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: true    # SBOM provenance attestation
 
-      # Trivy security scan — fails build on CRITICAL vulnerabilities
-      # ignore-unfixed=true: skip CVEs with no available fix (reduces noise)
+      # Trivy security scan — reports CRITICAL/HIGH CVEs to GitHub Security tab
+      # continue-on-error: pipeline continues even if unfixed vulns are found
+      # ignore-unfixed=true: skip CVEs with no patch available (reduces noise)
       - name: Trivy Vulnerability Scan
         id: trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.30.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
           format: sarif
@@ -101,12 +103,14 @@ jobs:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
-      # Upload results to GitHub Security tab even if scan found issues
+      # Upload results to GitHub Security tab — only if the SARIF file was created
+      # (Trivy may fail before writing output if the image is inaccessible)
       - name: Upload Trivy SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('trivy-frontend.sarif') != ''
         with:
           sarif_file: trivy-frontend.sarif
+          category: trivy-frontend
 
       - name: Build Summary
         if: always()

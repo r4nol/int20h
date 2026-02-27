@@ -9,7 +9,7 @@ spec:
   description: "Online Boutique — Production environment (manual sync only)"
 
   sourceRepos:
-    - "https://github.com/GITHUB_ORG/int20h"
+    - "https://github.com/r4nol/int20h"
     - "https://prometheus-community.github.io/helm-charts"
 
   destinations:

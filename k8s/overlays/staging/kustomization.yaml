@@ -8,15 +8,16 @@ resources:
   - network-policy.yaml
 
 # CI-managed image tags for frontend + cartservice
-# These values are updated automatically by .github/workflows/deploy.yaml
-# using: kustomize edit set image ghcr.io/OWNER/SERVICE:TAG
+# Initial state: uses upstream gcr.io images (ArgoCD can sync immediately)
+# After first CI run: deploy.yaml updates newName→ghcr.io and newTag→main-<sha>
+# Command used by CI: kustomize edit set image frontend=ghcr.io/r4nol/frontend:main-sha
 images:
   - name: frontend
-    newName: ghcr.io/GITHUB_ORG/frontend
-    newTag: "v0.10.2-upstream"
+    newName: gcr.io/google-samples/microservices-demo/frontend
+    newTag: "v0.10.2"
   - name: cartservice
-    newName: ghcr.io/GITHUB_ORG/cartservice
-    newTag: "v0.10.2-upstream"
+    newName: gcr.io/google-samples/microservices-demo/cartservice
+    newTag: "v0.10.2"
 
 patches:
   # All deployments run as single replica in staging (cost saving)

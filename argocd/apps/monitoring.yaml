@@ -21,7 +21,7 @@ spec:
         valueFiles:
           - $values/monitoring/helm/kube-prometheus-stack-values.yaml
 
-    - repoURL: https://github.com/GITHUB_ORG/int20h
+    - repoURL: https://github.com/r4nol/int20h
       targetRevision: HEAD
       ref: values  # This ref is used as $values in the valueFiles above
 

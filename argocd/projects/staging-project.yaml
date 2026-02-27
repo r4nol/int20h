@@ -10,7 +10,7 @@ spec:
 
   # Only deploy from our repository
   sourceRepos:
-    - "https://github.com/GITHUB_ORG/int20h"
+    - "https://github.com/r4nol/int20h"
     - "https://prometheus-community.github.io/helm-charts"
     - "https://argoproj.github.io/argo-helm"
 
