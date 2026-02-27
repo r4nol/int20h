@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: staging
+
+resources:
+  - ../../base
+  - network-policy.yaml
+
+# CI-managed image tags for frontend + cartservice
+# These values are updated automatically by .github/workflows/deploy.yaml
+# using: kustomize edit set image ghcr.io/OWNER/SERVICE:TAG
+images:
+  - name: frontend
+    newName: ghcr.io/GITHUB_ORG/frontend
+    newTag: "v0.10.2-upstream"
+  - name: cartservice
+    newName: ghcr.io/GITHUB_ORG/cartservice
+    newTag: "v0.10.2-upstream"
+
+patches:
+  # All deployments run as single replica in staging (cost saving)
+  - path: patches/replicas.yaml
+    target:
+      kind: Deployment
+  # Reduce resource requests for staging
+  - path: patches/resources-frontend.yaml
+    target:
+      kind: Deployment
+      name: frontend
+  # Change frontend-external from LoadBalancer to NodePort for staging
+  - path: patches/frontend-service.yaml
+    target:
+      kind: Service
+      name: frontend-external
+  # Disable loadgenerator in staging (run manually for demos)
+  - path: patches/loadgenerator.yaml
+    target:
+      kind: Deployment
+      name: loadgenerator

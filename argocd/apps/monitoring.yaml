@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Wave -1: monitoring deploys BEFORE the application (so dashboards are ready)
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+
+  # Multi-source: Helm chart from public repo + values file from our Git repo
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: "65.x"
+      helm:
+        # Reference values file from the second source using $values
+        valueFiles:
+          - $values/monitoring/helm/kube-prometheus-stack-values.yaml
+
+    - repoURL: https://github.com/GITHUB_ORG/int20h
+      targetRevision: HEAD
+      ref: values  # This ref is used as $values in the valueFiles above
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      # kube-prometheus-stack CRDs are large; this prevents timeout
+      - Replace=false

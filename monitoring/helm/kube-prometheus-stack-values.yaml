@@ -1,0 +1,203 @@
+# kube-prometheus-stack Helm values
+# Tuned for k3s single-node deployment on Oracle Cloud ARM VM
+
+# ── Prometheus ────────────────────────────────────────────────────────────────
+prometheus:
+  prometheusSpec:
+    scrapeInterval: "30s"
+    evaluationInterval: "30s"
+    retention: 15d
+    retentionSize: "10GB"
+    replicas: 1
+
+    # k3s uses local-path StorageClass by default
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 20Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+    # Scrape Online Boutique pods in both namespaces
+    # Uses prometheus.io/scrape annotation set in kustomize base
+    additionalScrapeConfigs:
+      - job_name: "online-boutique-staging"
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [staging]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: service
+
+      - job_name: "online-boutique-production"
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [production]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: service
+
+# ── Grafana ───────────────────────────────────────────────────────────────────
+grafana:
+  enabled: true
+  adminPassword: "INT20H2026!"  # Change after first login
+
+  service:
+    type: NodePort
+    nodePort: 30300
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+  # Sidecar: auto-inject dashboards from ConfigMaps with label grafana_dashboard=1
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL  # Scan all namespaces
+      provider:
+        foldersFromFilesStructure: true
+
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s:30300"
+    # Allow anonymous read-only access for hackathon demo
+    auth.anonymous:
+      enabled: true
+      org_name: Main Org.
+      org_role: Viewer
+    # Enable unified alerting
+    unified_alerting:
+      enabled: true
+    # Disable old alerting
+    alerting:
+      enabled: false
+
+  # Pre-configured Prometheus data source
+  additionalDataSources:
+    - name: Prometheus
+      type: prometheus
+      url: http://kube-prometheus-stack-prometheus:9090
+      access: proxy
+      isDefault: true
+      jsonData:
+        timeInterval: "30s"
+
+# ── Alertmanager ──────────────────────────────────────────────────────────────
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ── Node Exporter ─────────────────────────────────────────────────────────────
+nodeExporter:
+  enabled: true
+
+# ── kube-state-metrics ────────────────────────────────────────────────────────
+kubeStateMetrics:
+  enabled: true  # Required for HPA, Deployment, Pod metrics
+
+# ── Default Prometheus alerting rules ─────────────────────────────────────────
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false              # k3s: embedded etcd, not exposed
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesSystem: true
+    node: true
+    prometheus: true
+    prometheusOperator: true
+
+# ── k3s-specific: disable scraping of control-plane components ────────────────
+# k3s does NOT expose these endpoints like kubeadm clusters do.
+# Enabling them causes permanent scrape failures and noisy alerts.
+kubeEtcd:
+  enabled: false
+
+kubeControllerManager:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+# kubelet IS exposed by k3s
+kubelet:
+  enabled: true
+  serviceMonitor:
+    https: true
+    # Drop high-cardinality metrics to reduce storage usage
+    metricRelabelings:
+      - action: drop
+        regex: container_cpu_cfs_throttled_seconds_total
+        sourceLabels: [__name__]
+      - action: drop
+        regex: container_fs_(reads|writes)_bytes_total
+        sourceLabels: [__name__]

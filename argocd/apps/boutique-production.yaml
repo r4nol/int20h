@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: boutique-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Wave 1: deploys after staging is healthy (wave 0)
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: boutique-production
+
+  source:
+    repoURL: https://github.com/GITHUB_ORG/int20h
+    targetRevision: HEAD
+    path: k8s/overlays/production
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    # Production: NO automated sync
+    # Deployment requires either:
+    #   1. Manual click in ArgoCD UI
+    #   2. workflow_dispatch on .github/workflows/deploy.yaml
+    automated: null
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 2
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: frontend
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+    - group: apps
+      kind: Deployment
+      name: cartservice
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+    # HPA may update replica count; ignore to prevent ArgoCD overriding HPA decisions
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - helm/dashboard-configmaps.yaml
+
+# Generate ConfigMaps from dashboard JSON files
+# Grafana sidecar detects these by the grafana_dashboard=1 label
+configMapGenerator:
+  - name: grafana-dashboard-red-method
+    files:
+      - red-method.json=dashboards/red-method.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: "Online Boutique"
+
+  - name: grafana-dashboard-slo-error-budget
+    files:
+      - slo-error-budget.json=dashboards/slo-error-budget.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: "Online Boutique"
+
+  - name: grafana-dashboard-k8s-resources
+    files:
+      - k8s-resources.json=dashboards/k8s-resources.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: "Online Boutique"
+
+generatorOptions:
+  disableNameSuffixHash: true

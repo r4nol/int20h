@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: boutique-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "Online Boutique — Production environment (manual sync only)"
+
+  sourceRepos:
+    - "https://github.com/GITHUB_ORG/int20h"
+    - "https://prometheus-community.github.io/helm-charts"
+
+  destinations:
+    - namespace: production
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRole
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRoleBinding
+    - group: "networking.k8s.io"
+      kind: NetworkPolicy
+    - group: "policy"
+      kind: PodDisruptionBudget
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  # Production deploys are only allowed Mon-Fri 07:00-20:00 UTC
+  # Manual sync is always available regardless of window
+  syncWindows:
+    - kind: allow
+      schedule: "0 7 * * 1-5"
+      duration: 13h
+      applications:
+        - "*"
+      manualSync: true
+
+  orphanedResources:
+    warn: true

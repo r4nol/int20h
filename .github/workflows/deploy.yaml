@@ -1,0 +1,226 @@
+name: "Deploy (shared)"
+
+# Reusable workflow — called by ci-frontend.yaml and ci-cartservice.yaml
+# Also supports manual production promotion via workflow_dispatch
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+        description: "Service name: frontend or cartservice"
+      image-tag:
+        required: true
+        type: string
+        description: "Docker image tag to deploy"
+      environment:
+        required: true
+        type: string
+        description: "Target environment: staging or production"
+
+  # Manual production promotion
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to deploy"
+        required: true
+        type: choice
+        options: [frontend, cartservice]
+      image-tag:
+        description: "Image tag to promote (e.g. main-abc1234)"
+        required: true
+        type: string
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+
+permissions:
+  contents: write   # GitOps: commit updated kustomize image tag
+  id-token: write   # OIDC JWT for k8s API authentication
+
+jobs:
+  # ── Step 1: Commit new image tag to Git (GitOps pattern) ─────────────────
+  update-kustomize:
+    name: "GitOps: Update ${{ inputs.service }} → ${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+    # GitHub Environment enables protection rules (required reviewers for production)
+    environment: ${{ inputs.environment }}
+    outputs:
+      commit-sha: ${{ steps.commit.outputs.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: "5.3.0"
+
+      # Update image tag in the overlay kustomization.yaml
+      # ArgoCD will detect this commit and sync the new image
+      - name: Update Image Tag
+        run: |
+          OVERLAY="k8s/overlays/${{ inputs.environment }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ inputs.service }}"
+          TAG="${{ inputs.image-tag }}"
+
+          echo "Updating ${IMAGE}:${TAG} in ${OVERLAY}"
+          cd "${OVERLAY}"
+          kustomize edit set image "${IMAGE}:${TAG}"
+
+          echo "=== Updated kustomization.yaml ==="
+          cat kustomization.yaml
+
+      - name: Commit Updated Image Tag
+        id: commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "k8s/overlays/${{ inputs.environment }}/kustomization.yaml"
+
+          # Exit gracefully if nothing changed (idempotent re-runs)
+          if git diff --staged --quiet; then
+            echo "No changes to commit (image tag already up to date)"
+            echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          git commit -m "chore(deploy): ${{ inputs.service }} → ${{ inputs.image-tag }} in ${{ inputs.environment }}
+
+          Service:     ${{ inputs.service }}
+          Image tag:   ${{ inputs.image-tag }}
+          Environment: ${{ inputs.environment }}
+          Triggered:   ${{ github.workflow }} #${{ github.run_number }}
+          Actor:       ${{ github.actor }}
+          Ref:         ${{ github.sha }}"
+
+          git push
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+  # ── Step 2: Wait for ArgoCD to sync the new commit ───────────────────────
+  verify-argocd-sync:
+    name: "Verify ArgoCD Sync (${{ inputs.environment }})"
+    needs: update-kustomize
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+
+      # Exchange GitHub Actions OIDC token for k3s API access
+      # No kubeconfig or long-lived credentials needed!
+      - name: Authenticate to k3s via OIDC
+        env:
+          K8S_SERVER: ${{ secrets.K8S_SERVER }}
+        run: |
+          # Request OIDC token from GitHub's token endpoint
+          # Audience must match --oidc-client-id in k3s server flags
+          OIDC_TOKEN=$(curl -fsSL \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=my-k3s-cluster" \
+            | jq -r '.value')
+
+          # Mask the token in logs
+          echo "::add-mask::${OIDC_TOKEN}"
+
+          # Configure kubectl with the OIDC token
+          kubectl config set-cluster k3s \
+            --server="${K8S_SERVER}" \
+            --insecure-skip-tls-verify=true
+
+          kubectl config set-credentials github-actions \
+            --token="${OIDC_TOKEN}"
+
+          kubectl config set-context default \
+            --cluster=k3s \
+            --user=github-actions
+
+          kubectl config use-context default
+
+          # Verify authentication works
+          kubectl get nodes
+
+      # ArgoCD syncs after detecting the new git commit
+      # Poll until Application is Healthy+Synced or timeout
+      - name: Wait for ArgoCD Application Sync
+        timeout-minutes: 8
+        run: |
+          APP_NAME="boutique-${{ inputs.environment }}"
+
+          echo "Waiting for ArgoCD to sync ${APP_NAME}..."
+
+          # Give ArgoCD time to detect the new commit (webhook or polling interval)
+          sleep 30
+
+          SUCCESS=false
+          for i in $(seq 1 25); do
+            HEALTH=$(kubectl get application "${APP_NAME}" \
+              -n argocd \
+              -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+            SYNC=$(kubectl get application "${APP_NAME}" \
+              -n argocd \
+              -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            MESSAGE=$(kubectl get application "${APP_NAME}" \
+              -n argocd \
+              -o jsonpath='{.status.conditions[0].message}' 2>/dev/null || echo "")
+
+            echo "[${i}/25] health=${HEALTH} sync=${SYNC} ${MESSAGE}"
+
+            if [[ "${HEALTH}" == "Healthy" && "${SYNC}" == "Synced" ]]; then
+              SUCCESS=true
+              break
+            fi
+
+            # Fail fast on known error states
+            if [[ "${HEALTH}" == "Degraded" ]]; then
+              echo "ERROR: Application is Degraded. Check ArgoCD UI."
+              exit 1
+            fi
+
+            sleep 15
+          done
+
+          if [[ "${SUCCESS}" != "true" ]]; then
+            echo "TIMEOUT: ArgoCD did not sync within the expected time."
+            echo "Check ArgoCD UI at \${{ secrets.ARGOCD_URL }}"
+            exit 1
+          fi
+
+          echo "Deployment verified: ${APP_NAME} is Healthy and Synced"
+
+      - name: Verify Pods Running
+        run: |
+          NS="${{ inputs.environment }}"
+          echo "Checking pods in namespace: ${NS}"
+          kubectl get pods -n "${NS}"
+
+          # Ensure no pods are in CrashLoopBackOff or Error state
+          UNHEALTHY=$(kubectl get pods -n "${NS}" \
+            --field-selector='status.phase!=Running,status.phase!=Succeeded' \
+            -o name 2>/dev/null | wc -l)
+
+          if [[ "${UNHEALTHY}" -gt 0 ]]; then
+            echo "WARNING: ${UNHEALTHY} pod(s) not in Running state"
+            kubectl get pods -n "${NS}" --field-selector='status.phase!=Running,status.phase!=Succeeded'
+          fi
+
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| | |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | \`${{ inputs.service }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image Tag | \`${{ inputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | **${{ inputs.environment }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| ArgoCD App | \`boutique-${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY

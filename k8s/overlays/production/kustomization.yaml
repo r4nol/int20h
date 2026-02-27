@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: production
+
+resources:
+  - ../../base
+  - network-policy.yaml
+  - hpa/frontend-hpa.yaml
+  - hpa/cartservice-hpa.yaml
+  - pdb/frontend-pdb.yaml
+  - pdb/cartservice-pdb.yaml
+
+# CI-managed image tags for frontend + cartservice
+# Updated automatically by .github/workflows/deploy.yaml
+images:
+  - name: frontend
+    newName: ghcr.io/GITHUB_ORG/frontend
+    newTag: "v0.10.2-upstream"
+  - name: cartservice
+    newName: ghcr.io/GITHUB_ORG/cartservice
+    newTag: "v0.10.2-upstream"
+
+patches:
+  # Production: frontend x2, cartservice x2, rest x1
+  - path: patches/replicas.yaml
+    target:
+      kind: Deployment
+  # Full resource limits for production
+  - path: patches/resources-frontend.yaml
+    target:
+      kind: Deployment
+      name: frontend
+  # NodePort for production frontend
+  - path: patches/frontend-service.yaml
+    target:
+      kind: Service
+      name: frontend-external
+  # Zero-downtime rolling update strategy
+  - path: patches/rolling-update-frontend.yaml
+    target:
+      kind: Deployment
+      name: frontend
+  - path: patches/rolling-update-frontend.yaml
+    target:
+      kind: Deployment
+      name: cartservice
+  # Disable loadgenerator in production
+  - path: patches/loadgenerator.yaml
+    target:
+      kind: Deployment
+      name: loadgenerator

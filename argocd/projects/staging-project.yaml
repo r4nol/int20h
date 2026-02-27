@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: boutique-staging
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "Online Boutique — Staging environment (continuous deployment)"
+
+  # Only deploy from our repository
+  sourceRepos:
+    - "https://github.com/GITHUB_ORG/int20h"
+    - "https://prometheus-community.github.io/helm-charts"
+    - "https://argoproj.github.io/argo-helm"
+
+  destinations:
+    - namespace: staging
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  # Allow cluster-level resources (Namespace, ClusterRole, etc.)
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRole
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRoleBinding
+
+  # Allow all namespace-level resources
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  # Warn in ArgoCD UI when resources exist that are not tracked in Git
+  orphanedResources:
+    warn: true

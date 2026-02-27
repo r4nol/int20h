@@ -1,0 +1,28 @@
+# Copy this file to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars to git (it's in .gitignore)
+
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaaXXXXXXXXXXXXXXXXXXXX"
+user_ocid        = "ocid1.user.oc1..aaaaaaaaXXXXXXXXXXXXXXXXXXXX"
+fingerprint      = "xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx"
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "eu-frankfurt-1"
+
+compartment_ocid = "ocid1.compartment.oc1..aaaaaaaaXXXXXXXXXXXXXXXXXXXX"
+vcn_ocid         = "ocid1.vcn.oc1.eu-frankfurt-1.XXXXXXXXXXXX"
+subnet_ocid      = "ocid1.subnet.oc1.eu-frankfurt-1.XXXXXXXXXXXX"
+
+vm_display_name  = "int20h-k3s"
+vm_public_ip     = "1.2.3.4"       # Your Oracle VM public IP
+ssh_user         = "ubuntu"         # Or "opc" for Oracle Linux
+ssh_private_key  = <<-EOT
+-----BEGIN OPENSSH PRIVATE KEY-----
+YOUR_SSH_PRIVATE_KEY_CONTENT_HERE
+-----END OPENSSH PRIVATE KEY-----
+EOT
+
+k3s_version      = "v1.30.0+k3s1"
+github_repo      = "your-org/int20h"   # e.g. "john/int20h"
+
+# Restrict SSH to your IP (recommended for production)
+# allowed_ssh_cidr = "1.2.3.4/32"
+allowed_ssh_cidr = "0.0.0.0/0"

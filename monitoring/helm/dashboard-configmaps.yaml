@@ -1,0 +1,18 @@
+---
+# This file is applied by ArgoCD as part of the monitoring Application.
+# Grafana sidecar detects ConfigMaps with label grafana_dashboard=1
+# and automatically injects them into Grafana.
+#
+# The dashboard JSON is referenced from files in monitoring/dashboards/
+# and embedded here for GitOps deployment.
+#
+# To regenerate: run scripts/generate-dashboard-configmaps.sh
+
+# NOTE: actual JSON content is loaded by kustomize using configMapGenerator
+# See monitoring/kustomization.yaml for the generator config
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    kubernetes.io/metadata.name: monitoring
