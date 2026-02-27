@@ -17,7 +17,7 @@ images:
   newTag: latest
 - name: frontend
   newName: ghcr.io/r4nol/frontend
-  newTag: latest
+  newTag: frontend
 
   # All deployments run as single replica in staging (cost saving)
   # Reduce resource requests for staging
