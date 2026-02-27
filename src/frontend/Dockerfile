@@ -11,7 +11,7 @@
 # e.g. FROM golang:1.22 AS builder ... COPY . . ... RUN go build ...
 #      FROM gcr.io/distroless/base AS runtime ...
 
-FROM gcr.io/google-samples/microservices-demo/frontend:v0.10.2
+FROM gcr.io/google-samples/microservices-demo/frontend:v0.10.0
 
 # Metadata labels (OCI standard)
 LABEL org.opencontainers.image.source="https://github.com/r4nol/int20h"

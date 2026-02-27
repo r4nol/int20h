@@ -14,10 +14,10 @@ resources:
 images:
   - name: frontend
     newName: gcr.io/google-samples/microservices-demo/frontend
-    newTag: "v0.10.2"
+    newTag: "v0.10.0"
   - name: cartservice
     newName: gcr.io/google-samples/microservices-demo/cartservice
-    newTag: "v0.10.2"
+    newTag: "v0.10.0"
 
 patches:
   # All deployments run as single replica in staging (cost saving)

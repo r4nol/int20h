@@ -10,7 +10,7 @@
 # Cartservice: Go gRPC service + Redis client for shopping cart management
 # Original source: https://github.com/GoogleCloudPlatform/microservices-demo/tree/main/src/cartservice
 
-FROM gcr.io/google-samples/microservices-demo/cartservice:v0.10.2
+FROM gcr.io/google-samples/microservices-demo/cartservice:v0.10.0
 
 # Metadata labels (OCI standard)
 LABEL org.opencontainers.image.source="https://github.com/r4nol/int20h"
