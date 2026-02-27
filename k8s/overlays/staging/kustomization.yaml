@@ -16,8 +16,8 @@ images:
   newName: ghcr.io/r4nol/cartservice:cartservice
   newTag: main-032b9cf
 - name: frontend
-  newName: ghcr.io/r4nol/frontend
-  newTag: frontend
+  newName: ghcr.io/r4nol/frontend:frontend
+  newTag: main-032b9cf
 
   # All deployments run as single replica in staging (cost saving)
   # Reduce resource requests for staging
