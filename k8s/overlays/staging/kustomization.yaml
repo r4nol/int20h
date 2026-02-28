@@ -20,6 +20,9 @@ images:
 - name: gcr.io/google-samples/microservices-demo/frontend
   newName: ghcr.io/r4nol/frontend
   newTag: latest
+- name: gcr.io/google-samples/microservices-demo/loadgenerator
+  newName: ghcr.io/r4nol/loadgenerator
+  newTag: main-d1f08fc
 
   # All deployments (including loadgenerator) run as single replica in staging
   # Reduce resource requests for staging
