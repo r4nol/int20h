@@ -17,6 +17,9 @@ images:
 - name: gcr.io/google-samples/microservices-demo/cartservice
   newName: ghcr.io/r4nol/cartservice
   newTag: latest
+- name: gcr.io/google-samples/microservices-demo/currencyservice
+  newName: ghcr.io/r4nol/currencyservice
+  newTag: main-6e1bc64
 - name: gcr.io/google-samples/microservices-demo/frontend
   newName: ghcr.io/r4nol/frontend
   newTag: main-a2e20dc
