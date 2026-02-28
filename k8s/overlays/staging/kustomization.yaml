@@ -8,14 +8,16 @@ resources:
 - network-policy.yaml
 
 # CI-managed image tags for frontend + cartservice
-# Initial state: uses upstream gcr.io images (ArgoCD can sync immediately)
-# After first CI run: deploy.yaml updates newName→ghcr.io and newTag→main-<sha>
-# Command used by CI: kustomize edit set image frontend=ghcr.io/r4nol/frontend:main-sha
+# KEY: `name` must match the FULL image path set by base/kustomization.yaml (after newName transform).
+# Kustomize overlays do NOT override by short name — they match on the full resolved image name.
+# Command used by CI:
+#   kustomize edit set image \
+#     gcr.io/google-samples/microservices-demo/frontend=ghcr.io/r4nol/frontend:main-sha
 images:
-- name: cartservice
+- name: gcr.io/google-samples/microservices-demo/cartservice
   newName: ghcr.io/r4nol/cartservice
   newTag: main-032b9cf
-- name: frontend
+- name: gcr.io/google-samples/microservices-demo/frontend
   newName: ghcr.io/r4nol/frontend
   newTag: main-032b9cf
 

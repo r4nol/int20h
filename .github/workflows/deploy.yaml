@@ -80,11 +80,11 @@ jobs:
           echo "Updating ${SERVICE} → ${IMAGE}:${TAG} in ${OVERLAY}"
           cd "${OVERLAY}"
 
-          # KEY: use the short service name as the kustomize image key.
-          # This matches `name: frontend` / `name: cartservice` in kustomization.yaml.
-          # On the FIRST CI run, kustomize changes newName from gcr.io → ghcr.io AND
-          # sets the newTag to the commit SHA. On subsequent runs it only updates newTag.
-          kustomize edit set image "${SERVICE}=${IMAGE}:${TAG}"
+          # KEY: kustomize overlay `images:` matches on the FULL image name (after base transform).
+          # The base kustomization.yaml maps `cartservice` → `gcr.io/google-samples/...`.
+          # The overlay must reference that FULL gcr.io name to override it with GHCR.
+          BASE_IMAGE="gcr.io/google-samples/microservices-demo/${SERVICE}"
+          kustomize edit set image "${BASE_IMAGE}=${IMAGE}:${TAG}"
 
           echo "=== Updated kustomization.yaml ==="
           cat kustomization.yaml
