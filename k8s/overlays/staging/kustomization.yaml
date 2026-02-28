@@ -19,7 +19,7 @@ images:
   newTag: main-032b9cf
 - name: gcr.io/google-samples/microservices-demo/frontend
   newName: ghcr.io/r4nol/frontend
-  newTag: main-032b9cf
+  newTag: latest
 
   # All deployments run as single replica in staging (cost saving)
   # Reduce resource requests for staging
