@@ -28,7 +28,7 @@ echo "==> [2/6] Installing k3s ${K3S_VERSION}..."
 #   --oidc-username-claim    : Use 'sub' field as username (format: repo:ORG/REPO:ref:refs/heads/main)
 #   --oidc-username-prefix   : Prefix to namespace OIDC users from SA users
 #   --oidc-required-claim    : Reject tokens from other repos (security!)
-#   --disable=traefik        : We use NodePort directly, no ingress controller needed
+#   --disable=traefik        : Traefik is disabled; ingress-nginx is installed via ArgoCD
 #   --write-kubeconfig-mode  : Allow non-root to read kubeconfig
 curl -sfL https://get.k3s.io | \
   INSTALL_K3S_VERSION="${K3S_VERSION}" \

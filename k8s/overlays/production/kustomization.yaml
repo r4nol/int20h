@@ -11,7 +11,7 @@ resources:
   - pdb/frontend-pdb.yaml
   - pdb/cartservice-pdb.yaml
 
-# CI-managed image tags for frontend + cartservice
+# CI-managed image tags for promoted microservices
 # KEY: `name` must match the FULL gcr.io path from base/kustomization.yaml images.newName
 # Command used by CI:
 #   kustomize edit set image \

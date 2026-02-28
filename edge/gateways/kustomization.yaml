@@ -1,0 +1,86 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cluster-issuer.yaml
+  - argocd-ingress.yaml
+  - grafana-ingress.yaml
+  - staging-ingress.yaml
+  - production-ingress.yaml
+
+configMapGenerator:
+  - name: edge-hosts
+    envs:
+      - hosts.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: edge-hosts
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: argocd
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: edge-hosts
+      fieldPath: data.LETSENCRYPT_EMAIL
+    targets:
+      - select:
+          kind: ClusterIssuer
+          name: letsencrypt-http01
+        fieldPaths:
+          - spec.acme.email
+
+  - source:
+      kind: ConfigMap
+      name: edge-hosts
+      fieldPath: data.ARGOCD_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: argocd-gateway
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+
+  - source:
+      kind: ConfigMap
+      name: edge-hosts
+      fieldPath: data.GRAFANA_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: grafana-gateway
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+
+  - source:
+      kind: ConfigMap
+      name: edge-hosts
+      fieldPath: data.STAGING_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: staging-gateway
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+
+  - source:
+      kind: ConfigMap
+      name: edge-hosts
+      fieldPath: data.PRODUCTION_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: production-gateway
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0

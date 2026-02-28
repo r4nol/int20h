@@ -1,6 +1,6 @@
 name: "Deploy (shared)"
 
-# Reusable workflow — called by ci-frontend.yaml and ci-cartservice.yaml
+# Reusable workflow — called by ci-microservices.yaml
 # Also supports manual production promotion via workflow_dispatch
 on:
   workflow_call:
@@ -8,7 +8,7 @@ on:
       service:
         required: true
         type: string
-        description: "Service name: frontend or cartservice"
+        description: "Service name (one of Online Boutique 11 services)"
       image-tag:
         required: true
         type: string
@@ -25,7 +25,18 @@ on:
         description: "Service to deploy"
         required: true
         type: choice
-        options: [frontend, cartservice]
+        options:
+          - adservice
+          - cartservice
+          - checkoutservice
+          - currencyservice
+          - emailservice
+          - frontend
+          - loadgenerator
+          - paymentservice
+          - productcatalogservice
+          - recommendationservice
+          - shippingservice
       image-tag:
         description: "Image tag to promote (e.g. main-abc1234)"
         required: true

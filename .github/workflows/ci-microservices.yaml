@@ -1,0 +1,217 @@
+name: "CI — Microservices"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/ci-microservices.yaml"
+      - ".github/workflows/deploy.yaml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/ci-microservices.yaml"
+      - ".github/workflows/deploy.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  security-events: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  detect-services:
+    name: "Detect changed services"
+    runs-on: ubuntu-latest
+    outputs:
+      services_json: ${{ steps.detect.outputs.services_json }}
+      services_count: ${{ steps.detect.outputs.services_count }}
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build image tag
+        id: tag
+        run: |
+          echo "image_tag=main-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Detect changed services
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --depth=1 origin "${BASE_REF}"
+            DIFF_RANGE="origin/${BASE_REF}...HEAD"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            if [[ -z "${BASE}" || "${BASE}" == "0000000000000000000000000000000000000000" ]]; then
+              BASE="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            fi
+            DIFF_RANGE="${BASE}..${HEAD}"
+          fi
+
+          mapfile -t candidates < <(
+            git diff --name-only "${DIFF_RANGE}" \
+              | awk -F/ '/^src\/[^/]+\// {print $2}' \
+              | sort -u
+          )
+
+          services=()
+          for service in "${candidates[@]}"; do
+            if [[ -f "src/${service}/Dockerfile" || -f "src/${service}/src/Dockerfile" ]]; then
+              services+=("${service}")
+            fi
+          done
+
+          if [[ ${#services[@]} -eq 0 ]]; then
+            services_json="[]"
+          else
+            services_json="$(printf '%s\n' "${services[@]}" | jq -R . | jq -cs .)"
+          fi
+
+          echo "services_json=${services_json}" >> "$GITHUB_OUTPUT"
+          echo "services_count=$(jq 'length' <<<"${services_json}")" >> "$GITHUB_OUTPUT"
+          echo "Changed services: ${services_json}"
+
+  build-scan-push:
+    name: "Build/Scan/Push — ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    needs: detect-services
+    if: needs.detect-services.outputs.services_count != '0'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-services.outputs.services_json) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Docker context
+        id: docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          SERVICE="${{ matrix.service }}"
+
+          if [[ -f "src/${SERVICE}/Dockerfile" ]]; then
+            echo "context=src/${SERVICE}" >> "$GITHUB_OUTPUT"
+            echo "dockerfile=src/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
+          elif [[ -f "src/${SERVICE}/src/Dockerfile" ]]; then
+            echo "context=src/${SERVICE}/src" >> "$GITHUB_OUTPUT"
+            echo "dockerfile=src/${SERVICE}/src/Dockerfile" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile found for service ${SERVICE}"
+            exit 1
+          fi
+
+      - name: Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=main-,format=short,event=push
+            type=ref,event=pr,suffix=-${{ github.sha }}
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+          labels: |
+            org.opencontainers.image.title=Online Boutique ${{ matrix.service }}
+            org.opencontainers.image.description=Online Boutique microservice: ${{ matrix.service }}
+            org.opencontainers.image.vendor=INT20H Hackathon
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.docker.outputs.context }}
+          file: ${{ steps.docker.outputs.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+
+      - name: Trivy Vulnerability Scan
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}:${{ steps.meta.outputs.version }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.service)) != ''
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## ${SERVICE} CI Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| | |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | \`${SERVICE}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | \`${{ env.REGISTRY }}/${{ github.repository_owner }}/${SERVICE}:${{ steps.meta.outputs.version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Digest | \`${{ steps.build.outputs.digest }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trivy | ${{ steps.trivy.outcome }} |" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SERVICE: ${{ matrix.service }}
+
+  deploy-staging:
+    name: "Deploy → Staging (${{ matrix.service }})"
+    needs: [detect-services, build-scan-push]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.detect-services.outputs.services_count != '0'
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        service: ${{ fromJson(needs.detect-services.outputs.services_json) }}
+    uses: ./.github/workflows/deploy.yaml
+    with:
+      service: ${{ matrix.service }}
+      image-tag: ${{ needs.detect-services.outputs.image_tag }}
+      environment: staging
+    secrets: inherit
+    permissions:
+      contents: write
+      id-token: write

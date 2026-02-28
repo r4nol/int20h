@@ -1,20 +1,43 @@
-# INT20H Hackathon — Online Boutique Frontend
+# Copyright 2020 Google LLC
 #
-# This Dockerfile re-packages the upstream Google microservices-demo frontend
-# image under the project's GHCR namespace so the CI/CD pipeline can:
-#   1. Build a versioned, labeled image with BuildKit (multi-arch: amd64 + arm64)
-#   2. Scan it with Trivy and report results to GitHub Security tab
-#   3. Push to GHCR with a commit-SHA tag (main-<sha>)
-#   4. Have ArgoCD deploy the new tag via kustomize image override
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# To add custom code: replace the FROM with a multi-stage build
-# e.g. FROM golang:1.22 AS builder ... COPY . . ... RUN go build ...
-#      FROM gcr.io/distroless/base AS runtime ...
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-FROM gcr.io/google-samples/microservices-demo/frontend:v0.10.0
+FROM golang:1.22.2-alpine@sha256:cdc86d9f363e8786845bea2040312b4efa321b828acdeb26f393faa864d887b0 as builder
+RUN apk add --no-cache ca-certificates git
+RUN apk add build-base
+WORKDIR /src
 
-# Metadata labels (OCI standard)
-LABEL org.opencontainers.image.source="https://github.com/r4nol/int20h"
-LABEL org.opencontainers.image.description="Online Boutique Frontend — INT20H Hackathon"
-LABEL org.opencontainers.image.vendor="INT20H Team"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+# restore dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+
+# Skaffold passes in debug-oriented compiler flags
+ARG SKAFFOLD_GO_GCFLAGS
+RUN go build -gcflags="${SKAFFOLD_GO_GCFLAGS}" -o /go/bin/frontend .
+
+FROM alpine:3.19.1@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b as release
+RUN apk add --no-cache ca-certificates \
+    busybox-extras net-tools bind-tools
+WORKDIR /src
+COPY --from=builder /go/bin/frontend /src/server
+COPY ./templates ./templates
+COPY ./static ./static
+
+# Definition of this variable is used by 'skaffold debug' to identify a golang binary.
+# Default behavior - a failure prints a stack trace for the current goroutine.
+# See https://golang.org/pkg/runtime/
+ENV GOTRACEBACK=single
+
+EXPOSE 8080
+ENTRYPOINT ["/src/server"]

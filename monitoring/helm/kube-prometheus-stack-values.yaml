@@ -87,8 +87,7 @@ grafana:
   adminPassword: "INT20H2026!"  # Change after first login
 
   service:
-    type: NodePort
-    nodePort: 30300
+    type: ClusterIP
 
   resources:
     requests:
@@ -110,7 +109,7 @@ grafana:
 
   grafana.ini:
     server:
-      root_url: "%(protocol)s://%(domain)s:30300"
+      root_url: "%(protocol)s://%(domain)s/"
     # Allow anonymous read-only access for hackathon demo
     auth.anonymous:
       enabled: true

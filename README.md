@@ -1,6 +1,6 @@
 # INT20H 2026 — DevOps Track: Online Boutique on Oracle Cloud + k3s
 
-> **Live Demo:** `http://89.168.69.84:30080` | **ArgoCD:** `https://89.168.69.84:30443` | **Grafana:** `http://89.168.69.84:30300`
+> **Live Demo:** `https://int20h-production.r4nol.dev` | **ArgoCD:** `https://int20h-argocd.r4nol.dev` | **Grafana:** `https://int20h-grafana.r4nol.dev`
 
 ---
 
@@ -54,7 +54,7 @@
 ### CI/CD Flow Diagram
 
 ```
-Push to main (src/frontend or src/cartservice)
+Push to main (any src/<service>/...)
          │
          ▼
   GitHub Actions CI
@@ -150,10 +150,10 @@ This will:
 
 **Expected output:**
 ```
-frontend_production_url = "http://1.2.3.4:30080"
-frontend_staging_url    = "http://1.2.3.4:30180"
-argocd_url             = "https://1.2.3.4:30443"
-grafana_url            = "http://1.2.3.4:30300"
+frontend_production_url = "https://int20h-production.<your-domain>"
+frontend_staging_url    = "https://int20h-staging.<your-domain>"
+argocd_url             = "https://int20h-argocd.<your-domain>"
+grafana_url            = "https://int20h-grafana.<your-domain>"
 ```
 
 ### 4. Configure GitHub Actions Secrets
@@ -178,6 +178,35 @@ sed -i 's/GITHUB_ORG/your-org/g' argocd/apps/*.yaml
 # Apply the root App-of-Apps
 ssh ubuntu@VM_IP kubectl apply -f /path/to/argocd/root-app/root-application.yaml
 ```
+
+### 6. Configure Domain Hosts For TLS
+
+Set real FQDNs used in Cloudflare A records:
+
+```bash
+vim edge/gateways/hosts.env
+```
+
+Example:
+
+```env
+LETSENCRYPT_EMAIL=you@example.com
+ARGOCD_HOST=int20h-argocd.example.com
+GRAFANA_HOST=int20h-grafana.example.com
+STAGING_HOST=int20h-staging.example.com
+PRODUCTION_HOST=int20h-production.example.com
+```
+
+Then push to `main`. ArgoCD will deploy:
+- `ingress-nginx` (entrypoint on :80/:443)
+- `cert-manager` (Let's Encrypt)
+- ingress gateways with auto-issued TLS certs
+
+Cloudflare requirements:
+- A records for all four hosts must point to VM public IP
+- Keep ports `80` and `443` open on OCI Security List + VM iptables
+- SSL/TLS mode: `Full (strict)` after first cert issuance
+- If ACME HTTP-01 challenge fails while records are proxied, temporarily switch records to `DNS only`, wait for certs to become `Ready`, then enable proxy again
 
 ArgoCD will automatically create and sync all child Applications.
 
@@ -206,13 +235,14 @@ git push
 
 ### Automated (on push to `main`)
 
-1. Push code change to `src/frontend/` or `src/cartservice/`
-2. GitHub Actions triggers the relevant CI workflow
+1. Push code change to `src/<service>/` (for any of 11 services)
+   - Build context expects `src/<service>/Dockerfile` (or `src/<service>/src/Dockerfile` for cartservice layout)
+2. GitHub Actions (`ci-microservices.yaml`) detects changed services and runs CI per service
 3. Docker image is built (multi-arch: amd64 + arm64)
 4. Trivy scans for CRITICAL/HIGH vulnerabilities
 5. Image is pushed to `ghcr.io/ORG/SERVICE:main-<sha>`
 6. `deploy.yaml` updates `k8s/overlays/staging/kustomization.yaml` via `kustomize edit set image`
-7. Git commit is pushed: `chore(deploy): frontend → main-abc1234 in staging`
+7. Git commit is pushed: `chore(deploy): <service> → main-abc1234 in staging`
 8. ArgoCD detects the commit and syncs staging namespace automatically
 9. Deploy workflow polls ArgoCD status via OIDC until `Healthy+Synced`
 
@@ -233,7 +263,7 @@ Or via ArgoCD UI: click `Sync` on `boutique-production` Application.
 
 ## Monitoring & Dashboards
 
-Open Grafana at `http://VM_IP:30300` (anonymous read-only access).
+Open Grafana at `https://int20h-grafana.r4nol.dev` (anonymous read-only access).
 
 ### Dashboard 1: RED Method
 
@@ -372,8 +402,7 @@ terraform destroy
 ```
 int20h/
 ├── .github/workflows/
-│   ├── ci-frontend.yaml        # Build → Trivy scan → Push → Deploy staging
-│   ├── ci-cartservice.yaml     # Same for cartservice
+│   ├── ci-microservices.yaml   # Detect changed src/<service>, Build → Trivy → Push → Deploy staging
 │   └── deploy.yaml             # Shared: kustomize update + ArgoCD verify
 ├── terraform/
 │   ├── main.tf                 # OCI provider + module calls (data source for existing VM)
@@ -393,11 +422,17 @@ int20h/
 ├── argocd/
 │   ├── root-app/               # App-of-Apps bootstrap (single kubectl apply)
 │   ├── projects/               # AppProject per environment (source/dest restrictions)
-│   └── apps/                   # Child Applications (staging, production, monitoring)
+│   └── apps/                   # Child Applications (staging, production, monitoring, ingress, cert-manager)
+├── edge/
+│   └── gateways/               # Ingress + ClusterIssuer + host config (auto TLS)
 ├── monitoring/
 │   ├── helm/                   # kube-prometheus-stack Helm values (k3s-tuned)
 │   ├── dashboards/             # 3 Grafana dashboard JSONs
 │   └── kustomization.yaml      # ConfigMapGenerator for dashboard injection
+├── src/
+│   ├── frontend/               # Source + Dockerfile (editable)
+│   ├── cartservice/            # Source + Dockerfile in src/
+│   └── ... 9 more services     # Full upstream service sources (v0.10.0)
 └── README.md
 ```
 
@@ -409,7 +444,7 @@ int20h/
 |-------------|--------|---------|
 | Terraform піднімає/зносить інфраструктуру | ✅ | OCI Security Lists + k3s bootstrap via remote-exec |
 | Staging + Prod (K8S namespaces) з доступним frontend | ✅ | staging:30180, production:30080, NetworkPolicies |
-| CI/CD для 2 сервісів (build+push+deploy) | ✅ | frontend + cartservice, GitHub Actions, GHCR |
+| CI/CD для 11 сервісів (build+push+deploy) | ✅ | Будь-який `src/<service>` із Dockerfile, GitHub Actions, GHCR |
 | 2-3 корисних дашборди (reliability/scalability) | ✅ | RED Method + SLO Error Budget + K8s Resources |
 | README з скріншотами | ✅ | See `docs/screenshots/` after deployment |
 | Високорівневий опис cloud-архітектури | ✅ | Architecture diagram above |
@@ -424,18 +459,4 @@ int20h/
 
 ---
 
-## Screenshots
-
-> Add screenshots here after deployment.
-
-1. **ArgoCD UI** — All applications healthy and synced
-2. **Online Boutique** — Production frontend (http://VM_IP:30080)
-3. **GitHub Actions** — CI/CD pipeline run with Trivy scan
-4. **Grafana Dashboard 1** — RED Method (Rate/Errors/Duration)
-5. **Grafana Dashboard 2** — SLO Error Budget with burn rate
-6. **Grafana Dashboard 3** — K8s Resources (HPA, node health)
-7. **kubectl get pods** — Both namespaces running
-
----
-
-*Built for INT20H 2026 Hackathon — DevOps Track*
+*Built for INT20H 2026 Hackathon - DevOps Track*

@@ -7,7 +7,7 @@ resources:
 - ../../base
 - network-policy.yaml
 
-# CI-managed image tags for frontend + cartservice
+# CI-managed image tags for changed microservices
 # KEY: `name` must match the FULL image path set by base/kustomization.yaml (after newName transform).
 # Kustomize overlays do NOT override by short name — they match on the full resolved image name.
 # Command used by CI:

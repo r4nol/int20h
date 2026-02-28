@@ -15,7 +15,7 @@ resources:
   - shippingservice.yaml
 
 # Upstream images pinned to v0.10.0
-# CI overrides frontend + cartservice in overlays with custom GHCR images
+# CI may override any service image in overlays with GHCR tags
 images:
   - name: adservice
     newName: gcr.io/google-samples/microservices-demo/adservice
