@@ -16,7 +16,7 @@ resources:
 images:
 - name: gcr.io/google-samples/microservices-demo/cartservice
   newName: ghcr.io/r4nol/cartservice
-  newTag: main-032b9cf
+  newTag: latest
 - name: gcr.io/google-samples/microservices-demo/frontend
   newName: ghcr.io/r4nol/frontend
   newTag: latest
