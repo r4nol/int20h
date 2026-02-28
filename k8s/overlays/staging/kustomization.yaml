@@ -19,7 +19,7 @@ images:
   newTag: latest
 - name: gcr.io/google-samples/microservices-demo/frontend
   newName: ghcr.io/r4nol/frontend
-  newTag: latest
+  newTag: main-a2e20dc
 - name: gcr.io/google-samples/microservices-demo/loadgenerator
   newName: ghcr.io/r4nol/loadgenerator
   newTag: main-d1f08fc
