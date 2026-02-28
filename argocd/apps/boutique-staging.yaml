@@ -34,17 +34,3 @@ spec:
         factor: 2
         maxDuration: 3m
 
-  # Prevent ArgoCD from fighting CI-managed image tags
-  # CI updates the image tag via `kustomize edit set image` + git commit.
-  # ArgoCD should accept the committed value and not revert it.
-  ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      name: frontend
-      jsonPointers:
-        - /spec/template/spec/containers/0/image
-    - group: apps
-      kind: Deployment
-      name: cartservice
-      jsonPointers:
-        - /spec/template/spec/containers/0/image

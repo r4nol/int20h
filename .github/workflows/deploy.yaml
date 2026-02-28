@@ -71,6 +71,12 @@ jobs:
           IMAGE="ghcr.io/${{ github.repository_owner }}/${SERVICE}"
           TAG="${{ inputs.image-tag }}"
 
+          # Defensive: strip everything before the last colon in case image-tag
+          # was accidentally passed as "service:main-sha" instead of "main-sha".
+          # e.g.  "cartservice:main-032b9cf" → "main-032b9cf"
+          #       "main-032b9cf"             → "main-032b9cf" (no-op)
+          [[ "${TAG}" == *:* ]] && TAG="${TAG##*:}"
+
           echo "Updating ${SERVICE} → ${IMAGE}:${TAG} in ${OVERLAY}"
           cd "${OVERLAY}"
 
@@ -198,7 +204,7 @@ jobs:
 
           if [[ "${SUCCESS}" != "true" ]]; then
             echo "TIMEOUT: ArgoCD did not sync within the expected time."
-            echo "Check ArgoCD UI at \${{ secrets.ARGOCD_URL }}"
+            echo "Check ArgoCD UI at https://89.168.69.84:30443"
             exit 1
           fi
 

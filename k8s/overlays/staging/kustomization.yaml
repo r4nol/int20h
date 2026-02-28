@@ -13,10 +13,10 @@ resources:
 # Command used by CI: kustomize edit set image frontend=ghcr.io/r4nol/frontend:main-sha
 images:
 - name: cartservice
-  newName: ghcr.io/r4nol/cartservice:cartservice
+  newName: ghcr.io/r4nol/cartservice
   newTag: main-032b9cf
 - name: frontend
-  newName: ghcr.io/r4nol/frontend:frontend
+  newName: ghcr.io/r4nol/frontend
   newTag: main-032b9cf
 
   # All deployments run as single replica in staging (cost saving)
