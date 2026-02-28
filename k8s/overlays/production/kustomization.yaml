@@ -4,12 +4,12 @@ kind: Kustomization
 namespace: production
 
 resources:
-  - ../../base
-  - network-policy.yaml
-  - hpa/frontend-hpa.yaml
-  - hpa/cartservice-hpa.yaml
-  - pdb/frontend-pdb.yaml
-  - pdb/cartservice-pdb.yaml
+- ../../base
+- network-policy.yaml
+- hpa/frontend-hpa.yaml
+- hpa/cartservice-hpa.yaml
+- pdb/frontend-pdb.yaml
+- pdb/cartservice-pdb.yaml
 
 # CI-managed image tags for promoted microservices
 # KEY: `name` must match the FULL gcr.io path from base/kustomization.yaml images.newName
@@ -17,33 +17,33 @@ resources:
 #   kustomize edit set image \
 #     gcr.io/google-samples/microservices-demo/frontend=ghcr.io/r4nol/frontend:main-sha
 images:
-  - name: gcr.io/google-samples/microservices-demo/frontend
-    newName: gcr.io/google-samples/microservices-demo/frontend
-    newTag: "v0.10.0"
-  - name: gcr.io/google-samples/microservices-demo/cartservice
-    newName: gcr.io/google-samples/microservices-demo/cartservice
-    newTag: "v0.10.0"
+- name: gcr.io/google-samples/microservices-demo/cartservice
+  newName: gcr.io/google-samples/microservices-demo/cartservice
+  newTag: v0.10.0
+- name: gcr.io/google-samples/microservices-demo/frontend
+  newName: ghcr.io/r4nol/frontend
+  newTag: main-a2e20dc
 
-patches:
   # Production: frontend x2, cartservice x2, rest x1
   # NOTE: multi-doc patch file — NO target: here (each doc matches by metadata.name)
-  - path: patches/replicas.yaml
   # Full resource limits for production
-  - path: patches/resources-frontend.yaml
-    target:
-      kind: Deployment
-      name: frontend
   # NodePort for production frontend
-  - path: patches/frontend-service.yaml
-    target:
-      kind: Service
-      name: frontend-external
   # Zero-downtime rolling update strategy
-  - path: patches/rolling-update-frontend.yaml
-    target:
-      kind: Deployment
-      name: frontend
-  - path: patches/rolling-update-frontend.yaml
-    target:
-      kind: Deployment
-      name: cartservice
+patches:
+- path: patches/replicas.yaml
+- path: patches/resources-frontend.yaml
+  target:
+    kind: Deployment
+    name: frontend
+- path: patches/frontend-service.yaml
+  target:
+    kind: Service
+    name: frontend-external
+- path: patches/rolling-update-frontend.yaml
+  target:
+    kind: Deployment
+    name: frontend
+- path: patches/rolling-update-frontend.yaml
+  target:
+    kind: Deployment
+    name: cartservice
