@@ -51,9 +51,12 @@ images:
     newName: gcr.io/google-samples/microservices-demo/shippingservice
     newTag: v0.10.0
 
-commonLabels:
-  app.kubernetes.io/part-of: online-boutique
-  app.kubernetes.io/managed-by: argocd
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: online-boutique
+      app.kubernetes.io/managed-by: argocd
+    includeSelectors: false
+    includeTemplates: true
 
 commonAnnotations:
   prometheus.io/scrape: "true"

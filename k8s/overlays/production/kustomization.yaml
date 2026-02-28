@@ -12,22 +12,22 @@ resources:
   - pdb/cartservice-pdb.yaml
 
 # CI-managed image tags for frontend + cartservice
-# Initial state: uses upstream gcr.io images (ArgoCD can sync immediately)
-# After first CI run: deploy.yaml updates newName→ghcr.io and newTag→main-<sha>
-# Command used by CI: kustomize edit set image frontend=ghcr.io/r4nol/frontend:main-sha
+# KEY: `name` must match the FULL gcr.io path from base/kustomization.yaml images.newName
+# Command used by CI:
+#   kustomize edit set image \
+#     gcr.io/google-samples/microservices-demo/frontend=ghcr.io/r4nol/frontend:main-sha
 images:
-  - name: frontend
+  - name: gcr.io/google-samples/microservices-demo/frontend
     newName: gcr.io/google-samples/microservices-demo/frontend
     newTag: "v0.10.0"
-  - name: cartservice
+  - name: gcr.io/google-samples/microservices-demo/cartservice
     newName: gcr.io/google-samples/microservices-demo/cartservice
     newTag: "v0.10.0"
 
 patches:
   # Production: frontend x2, cartservice x2, rest x1
+  # NOTE: multi-doc patch file — NO target: here (each doc matches by metadata.name)
   - path: patches/replicas.yaml
-    target:
-      kind: Deployment
   # Full resource limits for production
   - path: patches/resources-frontend.yaml
     target:
