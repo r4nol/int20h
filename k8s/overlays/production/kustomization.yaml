@@ -47,8 +47,3 @@ patches:
     target:
       kind: Deployment
       name: cartservice
-  # Disable loadgenerator in production
-  - path: patches/loadgenerator.yaml
-    target:
-      kind: Deployment
-      name: loadgenerator

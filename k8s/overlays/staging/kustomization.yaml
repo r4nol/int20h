@@ -21,10 +21,9 @@ images:
   newName: ghcr.io/r4nol/frontend
   newTag: latest
 
-  # All deployments run as single replica in staging (cost saving)
+  # All deployments (including loadgenerator) run as single replica in staging
   # Reduce resource requests for staging
   # Change frontend-external from LoadBalancer to NodePort for staging
-  # Disable loadgenerator in staging (run manually for demos)
 patches:
 - path: patches/replicas.yaml
   target:
@@ -37,7 +36,3 @@ patches:
   target:
     kind: Service
     name: frontend-external
-- path: patches/loadgenerator.yaml
-  target:
-    kind: Deployment
-    name: loadgenerator
